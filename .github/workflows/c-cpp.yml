@@ -1,0 +1,50 @@
+name: OpenWrt Custom Build
+
+on:
+  workflow_dispatch:  # 手动触发构建
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build OpenWrt
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize build environment
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential ccache ecj fastjar file g++ gawk \
+            gettext git java-propose-classpath libelf-dev libncurses5-dev libssl-dev \
+            python3 python3-distutils python3-setuptools python3-dev rsync unzip \
+            zlib1g-dev subversion swig time xsltproc
+          git config --global user.name "taco"
+
+      - name: Clone OpenWrt source
+        run: |
+          git clone https://github.com/coolsnowwolf/lede openwrt
+          cp .config openwrt/.config
+
+      - name: Update and install feeds
+        working-directory: ./openwrt
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Download and prepare toolchain
+        working-directory: ./openwrt
+        run: |
+          make defconfig
+          make download -j8
+
+      - name: Build firmware
+        working-directory: ./openwrt
+        run: |
+          make -j$(nproc) V=s
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenWrt Firmware
+          path: openwrt/bin/targets/
